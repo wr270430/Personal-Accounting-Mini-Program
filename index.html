@@ -2248,17 +2248,21 @@ function drawPieChart() {
   const cx = w / 2, cy = h / 2 - 10, r = 105;
   const colors = ['#f43f5e','#fb923c','#fbbf24','#34d399','#38bdf8','#a78bfa','#2dd4bf','#818cf8','#fb7185','#4ade80'];
 
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#e2e8f0' : '#1e293b';
+  const mutedColor = isDark ? '#94a3b8' : '#475569';
+
   let startAngle = -Math.PI / 2;
   entries.forEach((entry, i) => {
     const slice = (entry[1] / total) * Math.PI * 2;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, startAngle, startAngle + slice); ctx.closePath();
     ctx.fillStyle = colors[i % colors.length]; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = isDark ? '#1e293b' : '#fff'; ctx.lineWidth = 2; ctx.stroke();
     const mid = startAngle + slice / 2;
     const pct = ((entry[1] / total) * 100).toFixed(1);
-    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 11px "PingFang SC", "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    if (parseFloat(pct) > 5) {
+    if (parseFloat(pct) > 3) {
+      ctx.fillStyle = textColor; ctx.font = 'bold 11px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const lx = cx + Math.cos(mid) * r * 0.68;
       const ly = cy + Math.sin(mid) * r * 0.68;
       ctx.fillText(entry[0], lx, ly - 7);
@@ -2270,10 +2274,11 @@ function drawPieChart() {
   const lx0 = w - 155;
   entries.forEach((entry, i) => {
     const y = 16 + i * 20;
+    const pct = ((entry[1] / total) * 100).toFixed(1);
     ctx.fillStyle = colors[i % colors.length]; ctx.beginPath();
     ctx.roundRect(lx0, y, 10, 10, 2); ctx.fill();
-    ctx.fillStyle = '#334155'; ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'left'; ctx.fillText(entry[0] + ' ' + formatMoney(entry[1]), lx0 + 16, y + 8);
+    ctx.fillStyle = mutedColor; ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText(entry[0] + ' ' + formatMoney(entry[1]) + ' (' + pct + '%)', lx0 + 16, y + 8);
   });
 }
 
