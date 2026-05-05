@@ -828,7 +828,7 @@ body::before {
 .category-bar .cat-bar-wrap {
   flex: 1;
   height: 24px;
-  background: #f1f5f9;
+  background: var(--border);
   border-radius: 12px;
   overflow: hidden;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
@@ -838,15 +838,17 @@ body::before {
   height: 100%;
   border-radius: 12px;
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
-  font-size: 11px;
-  color: #fff;
-  font-weight: 600;
-  min-width: 36px;
+  min-width: 4px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.category-bar .cat-bar-label {
+  width: 55px;
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 .category-bar .cat-amount {
@@ -2303,8 +2305,9 @@ function drawBarChart() {
     return `<div class="category-bar">
       <div class="cat-name">${CATEGORY_ICONS[entry[0]]||''} ${entry[0]}</div>
       <div class="cat-bar-wrap">
-        <div class="cat-bar-fill" style="width:${Math.max(pct, 1)}%;background:${colors[i % colors.length]}">${pct}%</div>
+        <div class="cat-bar-fill" style="width:${Math.max(pct, 1)}%;background:${colors[i % colors.length]}"></div>
       </div>
+      <div class="cat-bar-label">${pct}%</div>
       <div class="cat-amount">${formatMoney(entry[1])}</div>
     </div>`;
   }).join('');
@@ -2332,8 +2335,9 @@ function drawPaymentChart() {
     return `<div class="category-bar">
       <div class="cat-name">${icon} ${entry[0]}</div>
       <div class="cat-bar-wrap">
-        <div class="cat-bar-fill" style="width:${pct}%;background:${colors[i % colors.length]}">${pct}%</div>
+        <div class="cat-bar-fill" style="width:${Math.max(pct, 1)}%;background:${colors[i % colors.length]}"></div>
       </div>
+      <div class="cat-bar-label">${pct}%</div>
       <div class="cat-amount">${formatMoney(entry[1])}</div>
     </div>`;
   }).join('');
@@ -2346,6 +2350,12 @@ function drawTrendChart() {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? '#334155' : '#e2e8f0';
+  const labelColor = isDark ? '#94a3b8' : '#64748b';
+  const textColor = isDark ? '#e2e8f0' : '#334155';
+  const pointFill = isDark ? '#0f172a' : '#fff';
+
   const months = [];
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
@@ -2356,24 +2366,29 @@ function drawTrendChart() {
   const expenseData = months.map(m => transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === m).reduce((s, t) => s + t.amount, 0));
   const maxVal = Math.max(...incomeData, ...expenseData, 1);
 
-  const pad = { top: 20, right: 20, bottom: 40, left: 55 };
+  // Round maxVal up to a clean number for grid lines
+  const magnitude = Math.pow(10, Math.floor(Math.log10(maxVal || 1)));
+  const cleanMax = Math.ceil(maxVal / magnitude) * magnitude;
+
+  const pad = { top: 30, right: 20, bottom: 40, left: 55 };
   const pw = w - pad.left - pad.right;
   const ph = h - pad.top - pad.bottom;
 
-  // Grid lines
-  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+  // Grid lines + Y-axis labels
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + ph - (ph * i / 4);
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
-    ctx.fillStyle = '#64748b'; ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = labelColor; ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(Math.round(maxVal * i / 4), pad.left - 8, y);
+    const val = cleanMax * i / 4;
+    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val, pad.left - 8, y);
   }
 
   // X-axis labels
   months.forEach((m, i) => {
     const x = pad.left + (pw * i / (months.length - 1));
-    ctx.fillStyle = '#64748b'; ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = labelColor; ctx.font = '11px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center'; ctx.fillText(m.slice(5) + '月', x, h - pad.bottom + 18);
   });
 
@@ -2384,7 +2399,7 @@ function drawTrendChart() {
     ctx.beginPath();
     data.forEach((val, i) => {
       const x = pad.left + (pw * i / (data.length - 1));
-      const y = pad.top + ph - (ph * val / maxVal);
+      const y = pad.top + ph - (ph * val / cleanMax);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
@@ -2395,7 +2410,7 @@ function drawTrendChart() {
     ctx.beginPath();
     data.forEach((val, i) => {
       const x = pad.left + (pw * i / (data.length - 1));
-      const y = pad.top + ph - (ph * val / maxVal);
+      const y = pad.top + ph - (ph * val / cleanMax);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.lineTo(pad.left + pw, pad.top + ph);
@@ -2407,12 +2422,13 @@ function drawTrendChart() {
     // Data points
     data.forEach((val, i) => {
       const x = pad.left + (pw * i / (data.length - 1));
-      const y = pad.top + ph - (ph * val / maxVal);
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      const y = pad.top + ph - (ph * val / cleanMax);
+      ctx.fillStyle = pointFill; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#334155'; ctx.font = 'bold 10px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillStyle = textColor; ctx.font = 'bold 10px "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(val > 0 ? (val / 1000).toFixed(1) + 'k' : '0', x, y - 14);
+      const label = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toFixed(0);
+      ctx.fillText(label, x, y - 14);
     });
   }
 
@@ -2421,7 +2437,7 @@ function drawTrendChart() {
 
   // Legend
   ctx.fillStyle = '#10b981'; ctx.fillRect(w - 130, 8, 12, 12);
-  ctx.fillStyle = '#334155'; ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = textColor; ctx.font = '12px "PingFang SC", "Microsoft YaHei", sans-serif'; ctx.textAlign = 'left';
   ctx.fillText('收入', w - 114, 18);
   ctx.fillStyle = '#f43f5e'; ctx.fillRect(w - 60, 8, 12, 12);
   ctx.fillText('支出', w - 44, 18);
