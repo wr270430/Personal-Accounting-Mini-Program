@@ -1,0 +1,17 @@
+# Render.com 一键部署配置
+# 1. 将此目录上传到 GitHub
+# 2. 在 render.com 注册（免费），连接 GitHub 仓库
+# 3. Render 自动读取此文件并部署
+
+services:
+  - type: web
+    name: accounting-sync
+    env: python
+    buildCommand: ""
+    startCommand: python sync_server.py
+    envVars:
+      - key: SYNC_PORT
+        value: "10000"
+      - key: SYNC_TOKEN
+        value: ""
+    plan: free
