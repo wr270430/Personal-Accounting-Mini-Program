@@ -2005,7 +2005,7 @@ body::before {
 // ============================================================
 const STORAGE_KEY = 'accounting_data_v2';
 const EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '住房', '娱乐', '医疗', '教育', '通讯', '日用', '其他'];
-const INCOME_CATEGORIES = ['工资', '奖金', '兼职', '理财', '报销', '红包', '其他收入'];
+const INCOME_CATEGORIES = ['工资', '奖金', '兼职', '理财', '报销', '红包', '生活费', '补助', '其他收入'];
 const DEFAULT_PAYMENT_METHODS = ['现金', '微信', '支付宝', '银行卡', '信用卡', '其他'];
 const PM_STORAGE_KEY = 'accounting_payment_methods';
 const PM_ICONS_KEY = 'accounting_payment_icons';
@@ -2022,7 +2022,7 @@ function savePaymentMethods(methods) { localStorage.setItem(PM_STORAGE_KEY, JSON
 const INVOICE_TYPES = ['增值税普通发票', '增值税专用发票', '电子发票', '收据', '其他票据'];
 const CATEGORY_ICONS = {
   '餐饮':'🍽️','交通':'🚗','购物':'🛒','住房':'🏠','娱乐':'🎮','医疗':'💊','教育':'📚','通讯':'📱','日用':'🧴','其他':'📌',
-  '工资':'💼','奖金':'🎁','兼职':'💻','理财':'📈','报销':'🧾','红包':'🧧','其他收入':'📌'
+  '工资':'💼','奖金':'🎁','兼职':'💻','理财':'📈','报销':'🧾','红包':'🧧','生活费':'🏠','补助':'🎫','其他收入':'📌'
 };
 const DEFAULT_PAYMENT_ICONS = { '现金':'💵','微信':'💬','支付宝':'🔵','银行卡':'💳','信用卡':'💎','其他':'💰' };
 
