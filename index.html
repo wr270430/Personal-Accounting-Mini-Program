@@ -3142,26 +3142,32 @@ async function syncPull(silent = false) {
       headers['X-Sync-Token'] = config.token;
     }
 
-    const resp = await fetch(serverUrl + '/api/data', { headers });
+    const resp = await fetch(serverUrl + '/api/all', { headers });
 
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
 
-    if (result.data && result.data.length > 0) {
+    // Use merged data (all devices deduplicated) as source of truth
+    if (result.merged && result.merged.data) {
       const localMap = {};
       transactions.forEach(t => { localMap[t.id] = t; });
 
-      result.data.forEach(t => { localMap[t.id] = t; });
+      result.merged.data.forEach(t => {
+        if (!localMap[t.id] || (t.createdAt >= (localMap[t.id].createdAt || ''))) {
+          localMap[t.id] = t;
+        }
+      });
 
       transactions = Object.values(localMap);
       transactions.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
       saveData(transactions);
     }
 
-    if (result.memory && Object.keys(result.memory).length > 0) {
-      saveMemory(result.memory);
+    if (result.merged && result.merged.memory && Object.keys(result.merged.memory).length > 0) {
+      const mem = loadMemory();
+      saveMemory({ ...mem, ...result.merged.memory });
     }
 
     rebuildMemory();
