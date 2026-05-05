@@ -490,6 +490,50 @@ body::before {
 }
 
 /* ============================================================
+   Receipt / Ticket Attachment
+   ============================================================ */
+.receipt-upload-area {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.receipt-upload-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 8px 16px; border: 1.5px dashed var(--border);
+  border-radius: var(--radius-sm); background: linear-gradient(135deg, #fafbfd, #f8fafc);
+  cursor: pointer; font-size: 13px; color: var(--text-secondary);
+  transition: all var(--transition); font-family: inherit;
+}
+.receipt-upload-btn:hover {
+  border-color: var(--primary); color: var(--primary); background: var(--primary-bg);
+}
+.receipt-preview {
+  position: relative; width: 60px; height: 60px;
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 2px solid var(--border); background: var(--bg);
+}
+.receipt-preview img { width: 100%; height: 100%; object-fit: cover; }
+.receipt-preview .receipt-remove {
+  position: absolute; top: -4px; right: -4px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--expense); color: #fff; border: none;
+  cursor: pointer; font-size: 12px; display: flex;
+  align-items: center; justify-content: center; line-height: 1;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+.receipt-thumb {
+  width: 36px; height: 36px; border-radius: 6px; overflow: hidden;
+  border: 1.5px solid var(--border); cursor: pointer;
+  transition: all var(--transition); flex-shrink: 0; background: var(--bg);
+}
+.receipt-thumb:hover {
+  border-color: var(--primary); box-shadow: 0 2px 6px rgba(99,102,241,0.2); transform: scale(1.08);
+}
+.receipt-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.receipt-full-image { text-align: center; margin: 12px 0; }
+.receipt-full-image img {
+  max-width: 100%; max-height: 60vh; border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+}
+
+/* ============================================================
    Transaction List
    ============================================================ */
 .list-card {
@@ -765,6 +809,40 @@ body::before {
   color: var(--expense);
   box-shadow: 0 2px 8px rgba(244,63,94,0.08);
 }
+
+/* ============================================================
+   Payment Method Management
+   ============================================================ */
+.payment-method-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;
+}
+.payment-method-item:last-child { border-bottom: none; }
+.payment-method-item .pm-icon { margin-right: 8px; font-size: 16px; }
+.payment-method-item .pm-name { flex: 1; font-weight: 500; }
+.payment-method-item .pm-builtin { font-size: 10px; color: var(--text-muted); background: var(--border-light); padding: 1px 6px; border-radius: 8px; }
+.payment-method-item .pm-delete {
+  width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid transparent;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition); flex-shrink: 0;
+}
+.payment-method-item .pm-delete:hover {
+  background: var(--expense-light); color: var(--expense); border-color: var(--expense-light);
+}
+.pm-add-row { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.pm-add-row input {
+  flex: 1; padding: 8px 12px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 13px; outline: none;
+  font-family: inherit; transition: border-color var(--transition);
+}
+.pm-add-row input:focus { border-color: var(--primary); }
+.pm-add-row .pm-icon-select {
+  width: 44px; padding: 8px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 16px; text-align: center;
+  cursor: pointer; background: var(--bg);
+}
+.pm-list-scroll { max-height: 280px; overflow-y: auto; margin: 8px 0; }
 
 /* ============================================================
    Stats Cards
@@ -1574,7 +1652,7 @@ body::before {
 <body>
 
 <div class="header">
-  <h1>💰 记账系统 <span style="font-size:10px;color:#888;font-weight:normal">v2.2</span></h1>
+  <h1>💰 记账系统 <span style="font-size:10px;color:#888;font-weight:normal">v2.3</span></h1>
   <div class="date-display" id="currentDate"></div>
 </div>
 
@@ -1650,7 +1728,10 @@ body::before {
         </div>
         <div class="form-group">
           <label>支付方式</label>
-          <select id="inputPayment"></select>
+          <div style="display:flex;gap:6px">
+            <select id="inputPayment" style="flex:1"></select>
+            <button class="btn-outline" id="managePaymentBtn" title="管理支付方式" style="padding:10px;font-size:16px;border-radius:var(--radius-sm)">⚙️</button>
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -1680,6 +1761,14 @@ body::before {
           <div class="form-group" style="flex:1; min-width:140px">
             <label>发票号码</label>
             <input type="text" id="inputInvoiceNumber" placeholder="选填" maxlength="30">
+          </div>
+          <div class="receipt-upload-area" id="receiptUploadArea" style="flex-basis:100%">
+            <label style="font-size:12px;color:var(--text-secondary);font-weight:500;width:100%">📸 票据照片（可选）</label>
+            <button class="receipt-upload-btn" id="receiptCaptureBtn">📷 拍照/上传</button>
+            <div class="receipt-preview" id="receiptPreview" style="display:none">
+              <img id="receiptPreviewImg" src="" alt="票据预览">
+              <button class="receipt-remove" id="receiptRemoveBtn" title="移除照片">×</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1761,6 +1850,19 @@ body::before {
       <h3>💳 支付方式分布</h3>
       <div class="chart-box" id="paymentChartContainer"></div>
     </div>
+    <div class="stats-card" id="paymentStatsCard">
+      <h3>📊 支付方式统计（本月）</h3>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:12px;color:var(--text-secondary);font-weight:500;margin-bottom:8px">支出</div>
+          <div id="paymentStatsExpense"></div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:12px;color:var(--text-secondary);font-weight:500;margin-bottom:8px">收入</div>
+          <div id="paymentStatsIncome"></div>
+        </div>
+      </div>
+    </div>
     <div class="stats-card">
       <h3>📈 近6个月收支趋势</h3>
       <div class="chart-box" style="min-width:100%">
@@ -1785,6 +1887,7 @@ body::before {
 
 <!-- Hidden file input for import -->
 <input type="file" id="importFile" accept=".json,.csv" style="display:none">
+<input type="file" id="receiptFileInput" accept="image/*" capture="environment" style="display:none">
 
 <!-- Sync settings modal -->
 <div class="modal-overlay" id="syncModal">
@@ -1852,6 +1955,28 @@ body::before {
   </div>
 </div>
 
+<!-- Payment method management modal -->
+<div class="modal-overlay" id="paymentMethodModal">
+  <div class="modal-box" style="max-width:440px">
+    <h4>💳 支付方式管理</h4>
+    <div class="pm-list-scroll" id="paymentMethodList"></div>
+    <div class="pm-add-row">
+      <select class="pm-icon-select" id="pmIconSelect">
+        <option value="💵">💵</option><option value="💬">💬</option><option value="🔵">🔵</option>
+        <option value="💳">💳</option><option value="💎">💎</option><option value="💰">💰</option>
+        <option value="🏦">🏦</option><option value="📱">📱</option><option value="💲">💲</option>
+        <option value="🪙">🪙</option><option value="🎫">🎫</option><option value="🧧">🧧</option>
+      </select>
+      <input type="text" id="pmNewName" placeholder="新支付方式名称" maxlength="10">
+      <button class="btn-outline" id="pmAddBtn">+ 添加</button>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn-outline btn-danger" id="pmResetBtn">🔄 恢复默认</button>
+      <button class="btn-outline" id="paymentMethodModalClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- Invoice detail modal -->
 <div class="modal-overlay" id="invoiceModal">
   <div class="modal-box">
@@ -1863,6 +1988,17 @@ body::before {
   </div>
 </div>
 
+<!-- Receipt image modal -->
+<div class="modal-overlay" id="receiptImageModal">
+  <div class="modal-box" style="max-width:600px">
+    <h4>📸 票据照片</h4>
+    <div class="receipt-full-image" id="receiptImageContent"></div>
+    <div class="btn-row">
+      <button class="btn-outline" id="receiptImageModalClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // Data Layer
@@ -1870,13 +2006,45 @@ body::before {
 const STORAGE_KEY = 'accounting_data_v2';
 const EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '住房', '娱乐', '医疗', '教育', '通讯', '日用', '其他'];
 const INCOME_CATEGORIES = ['工资', '奖金', '兼职', '理财', '报销', '红包', '其他收入'];
-const PAYMENT_METHODS = ['现金', '微信', '支付宝', '银行卡', '信用卡', '其他'];
+const DEFAULT_PAYMENT_METHODS = ['现金', '微信', '支付宝', '银行卡', '信用卡', '其他'];
+const PM_STORAGE_KEY = 'accounting_payment_methods';
+const PM_ICONS_KEY = 'accounting_payment_icons';
+
+function getPaymentMethods() {
+  try {
+    const custom = JSON.parse(localStorage.getItem(PM_STORAGE_KEY));
+    if (Array.isArray(custom) && custom.length > 0) return custom;
+  } catch {}
+  return [...DEFAULT_PAYMENT_METHODS];
+}
+function savePaymentMethods(methods) { localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(methods)); }
+
 const INVOICE_TYPES = ['增值税普通发票', '增值税专用发票', '电子发票', '收据', '其他票据'];
 const CATEGORY_ICONS = {
   '餐饮':'🍽️','交通':'🚗','购物':'🛒','住房':'🏠','娱乐':'🎮','医疗':'💊','教育':'📚','通讯':'📱','日用':'🧴','其他':'📌',
   '工资':'💼','奖金':'🎁','兼职':'💻','理财':'📈','报销':'🧾','红包':'🧧','其他收入':'📌'
 };
-const PAYMENT_ICONS = { '现金':'💵','微信':'💬','支付宝':'🔵','银行卡':'💳','信用卡':'💎','其他':'💰' };
+const DEFAULT_PAYMENT_ICONS = { '现金':'💵','微信':'💬','支付宝':'🔵','银行卡':'💳','信用卡':'💎','其他':'💰' };
+
+function getPaymentIcons() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PM_ICONS_KEY));
+    return { ...DEFAULT_PAYMENT_ICONS, ...(saved || {}) };
+  } catch { return { ...DEFAULT_PAYMENT_ICONS }; }
+}
+function savePaymentIcons(icons) {
+  const custom = {};
+  for (const [k, v] of Object.entries(icons)) {
+    if (!DEFAULT_PAYMENT_ICONS[k]) custom[k] = v;
+  }
+  localStorage.setItem(PM_ICONS_KEY, JSON.stringify(custom));
+}
+function getPaymentIcon(method) { return getPaymentIcons()[method] || '💰'; }
+
+// Keep alias for backward compatibility in existing code
+let PAYMENT_ICONS = DEFAULT_PAYMENT_ICONS;
+function refreshPaymentIcons() { PAYMENT_ICONS = getPaymentIcons(); }
+refreshPaymentIcons();
 
 function loadData() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -1890,6 +2058,7 @@ let migrated = false;
 transactions = transactions.map(t => {
   if (!t.paymentMethod) { t.paymentMethod = '其他'; migrated = true; }
   if (t.hasInvoice === undefined) { t.hasInvoice = false; t.invoiceType = ''; t.invoiceNumber = ''; migrated = true; }
+  if (t.receiptImage === undefined) { t.receiptImage = ''; migrated = true; }
   return t;
 });
 if (migrated) saveData(transactions);
@@ -2087,6 +2256,62 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Receipt image handling
+let pendingReceiptImage = '';
+
+function compressImage(file, maxWidth, quality) {
+  maxWidth = maxWidth || 300; quality = quality || 0.7;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = function() { reject(new Error('图片加载失败')); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error('文件读取失败')); };
+    reader.readAsDataURL(file);
+  });
+}
+
+function handleReceiptFile(file) {
+  if (!file || !file.type.startsWith('image/')) { showToast('请选择图片文件'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('图片不能超过10MB'); return; }
+  compressImage(file, 300, 0.7).then(dataUrl => {
+    pendingReceiptImage = dataUrl;
+    document.getElementById('receiptPreviewImg').src = dataUrl;
+    document.getElementById('receiptPreview').style.display = 'block';
+    document.getElementById('receiptCaptureBtn').textContent = '📷 重新拍照';
+    showToast('照片已就绪');
+  }).catch(err => { showToast('图片处理失败：' + err.message); });
+}
+
+function clearReceiptImage() {
+  pendingReceiptImage = '';
+  document.getElementById('receiptPreview').style.display = 'none';
+  document.getElementById('receiptPreviewImg').src = '';
+  document.getElementById('receiptCaptureBtn').textContent = '📷 拍照/上传';
+  document.getElementById('receiptFileInput').value = '';
+}
+
+function showReceiptImage(dataUrl) {
+  if (!dataUrl) return;
+  document.getElementById('receiptImageContent').innerHTML = `<img src="${dataUrl}" alt="票据照片" style="max-width:100%;max-height:70vh;border-radius:8px">`;
+  document.getElementById('receiptImageModal').classList.add('show');
+}
+
+function showReceiptImageById(id) {
+  const t = transactions.find(tx => tx.id === id);
+  if (t && t.receiptImage) showReceiptImage(t.receiptImage);
+}
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -2121,8 +2346,104 @@ function updateCategorySelect() {
 }
 
 function updatePaymentSelect() {
+  refreshPaymentIcons();
   const sel = document.getElementById('inputPayment');
-  sel.innerHTML = PAYMENT_METHODS.map(p => `<option value="${p}">${(PAYMENT_ICONS[p]||'')} ${p}</option>`).join('');
+  sel.innerHTML = getPaymentMethods().map(p => `<option value="${p}">${(getPaymentIcon(p))} ${p}</option>`).join('');
+}
+
+// Payment method management UI
+function renderPaymentMethodList() {
+  const container = document.getElementById('paymentMethodList');
+  const methods = getPaymentMethods();
+  const builtins = new Set(DEFAULT_PAYMENT_METHODS);
+  container.innerHTML = methods.map(m => {
+    const isBuiltin = builtins.has(m);
+    return `<div class="payment-method-item">
+      <span class="pm-icon">${getPaymentIcon(m)}</span>
+      <span class="pm-name">${escapeHtml(m)}</span>
+      ${isBuiltin ? '<span class="pm-builtin">默认</span>' : ''}
+      ${!isBuiltin ? `<button class="pm-delete" data-name="${escapeHtml(m)}" title="删除">×</button>` : ''}
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.pm-delete').forEach(btn => {
+    btn.addEventListener('click', () => deletePaymentMethod(btn.dataset.name));
+  });
+}
+
+function addPaymentMethod() {
+  const nameInput = document.getElementById('pmNewName');
+  const iconSelect = document.getElementById('pmIconSelect');
+  const name = nameInput.value.trim();
+  if (!name) { showToast('请输入支付方式名称'); return; }
+  if (name.length > 10) { showToast('名称不能超过10个字'); return; }
+  const methods = getPaymentMethods();
+  if (methods.includes(name)) { showToast('该支付方式已存在'); return; }
+  methods.push(name);
+  savePaymentMethods(methods);
+  const icons = getPaymentIcons();
+  icons[name] = iconSelect.value;
+  savePaymentIcons(icons);
+  refreshPaymentIcons();
+  nameInput.value = '';
+  renderPaymentMethodList();
+  updatePaymentSelect();
+  updateFilterPayment();
+  showToast('已添加：' + name);
+}
+
+function deletePaymentMethod(name) {
+  if (DEFAULT_PAYMENT_METHODS.includes(name)) { showToast('默认支付方式不可删除'); return; }
+  const methods = getPaymentMethods();
+  const idx = methods.indexOf(name);
+  if (idx > -1) { methods.splice(idx, 1); savePaymentMethods(methods); }
+  renderPaymentMethodList();
+  updatePaymentSelect();
+  updateFilterPayment();
+  showToast('已删除：' + name);
+}
+
+function resetPaymentMethods() {
+  if (!confirm('确定恢复默认支付方式吗？已有记录不受影响。')) return;
+  savePaymentMethods([...DEFAULT_PAYMENT_METHODS]);
+  refreshPaymentIcons();
+  renderPaymentMethodList();
+  updatePaymentSelect();
+  updateFilterPayment();
+  showToast('已恢复默认支付方式');
+}
+
+function drawPaymentStats() {
+  const monthKey = currentMonthKey();
+  const monthTx = transactions.filter(t => getMonthKey(t.date) === monthKey);
+  const expenseTx = monthTx.filter(t => t.type === 'expense');
+  const incomeTx = monthTx.filter(t => t.type === 'income');
+
+  function renderStats(txs, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (txs.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px 0">暂无数据</div>';
+      return;
+    }
+    const agg = {};
+    txs.forEach(t => { agg[t.paymentMethod] = (agg[t.paymentMethod] || 0) + t.amount; });
+    const entries = Object.entries(agg).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((s, e) => s + e[1], 0);
+    const colors = ['#6366f1','#10b981','#fb923c','#f43f5e','#38bdf8','#a78bfa','#2dd4bf','#fbbf24','#fb7185','#4ade80'];
+    container.innerHTML = entries.map((entry, i) => {
+      const pct = total > 0 ? ((entry[1] / total) * 100).toFixed(1) : 0;
+      return `<div class="category-bar">
+        <div class="cat-name">${getPaymentIcon(entry[0])} ${escapeHtml(entry[0])}</div>
+        <div class="cat-bar-wrap">
+          <div class="cat-bar-fill" style="width:${Math.max(pct, 1)}%;background:${colors[i % colors.length]}"></div>
+        </div>
+        <div class="cat-bar-label">${pct}%</div>
+        <div class="cat-amount">${formatMoney(entry[1])}</div>
+      </div>`;
+    }).join('');
+  }
+  renderStats(expenseTx, 'paymentStatsExpense');
+  renderStats(incomeTx, 'paymentStatsIncome');
 }
 
 function updateFilterMonth() {
@@ -2135,7 +2456,9 @@ function updateFilterCategory() {
   updateFilterSelect('filterCategory', [...new Set(transactions.map(t => t.category))].sort(), '全部分类');
 }
 function updateFilterPayment() {
-  const methods = [...new Set(transactions.map(t => t.paymentMethod))].sort();
+  const used = new Set(transactions.map(t => t.paymentMethod));
+  const configured = new Set(getPaymentMethods());
+  const methods = [...new Set([...configured, ...used])].sort();
   updateFilterSelect('filterPayment', methods, '全部支付');
 }
 function updateFilterSelect(id, items, placeholder) {
@@ -2178,6 +2501,9 @@ function renderList() {
     if (t.hasInvoice) {
       tags.push(`<span class="badge badge-invoice" data-id="${t.id}" style="cursor:pointer" onclick="showInvoiceDetail(${t.id})">🧾 发票</span>`);
     }
+    if (t.receiptImage) {
+      tags.push(`<span class="receipt-thumb" onclick="showReceiptImageById(${t.id})" title="查看票据照片"><img src="${t.receiptImage}" alt="票据"></span>`);
+    }
     return `
     <div class="transaction-item">
       <div class="tx-icon ${t.type}">${CATEGORY_ICONS[t.category] || '📌'}</div>
@@ -2211,6 +2537,7 @@ function showInvoiceDetail(id) {
       <div><strong>关联金额：</strong>${formatMoney(t.amount)}</div>
       <div><strong>日期：</strong>${t.date}</div>
       <div><strong>分类：</strong>${t.category}</div>
+      ${t.receiptImage ? `<div style="margin-top:10px"><div class="receipt-thumb" style="width:48px;height:48px;display:inline-flex;cursor:pointer" onclick="showReceiptImageById(${t.id})" title="点击查看大图"><img src="${t.receiptImage}" alt="票据照片"></div></div>` : ''}
     </div>`;
   document.getElementById('invoiceModal').classList.add('show');
 }
@@ -2485,6 +2812,7 @@ function refreshStats() {
   drawPieChart();
   drawBarChart();
   drawPaymentChart();
+  drawPaymentStats();
   drawTrendChart();
   drawInvoiceStats();
 }
@@ -2833,6 +3161,7 @@ function addTransaction() {
     hasInvoice,
     invoiceType: hasInvoice ? document.getElementById('inputInvoiceType').value : '',
     invoiceNumber: hasInvoice ? document.getElementById('inputInvoiceNumber').value.trim() : '',
+    receiptImage: hasInvoice ? pendingReceiptImage : '',
     createdAt: new Date().toISOString()
   };
 
@@ -2846,6 +3175,7 @@ function addTransaction() {
   document.querySelector('input[name="invoiceToggle"][value="none"]').checked = true;
   document.getElementById('invoiceFields').classList.remove('show');
   document.getElementById('inputInvoiceNumber').value = '';
+  clearReceiptImage();
   document.getElementById('inputAmount').focus();
 
   showToast('✓ 记录成功！系统已记住此模式 🧠');
@@ -2865,10 +3195,10 @@ function exportJSON() {
 
 function exportCSV() {
   const BOM = '﻿';
-  const headers = ['ID','类型','金额','分类','支付方式','日期','备注','有发票','发票类型','发票号码','创建时间'];
+  const headers = ['ID','类型','金额','分类','支付方式','日期','备注','有发票','发票类型','发票号码','有票据照片','创建时间'];
   const rows = transactions.map(t => [
     t.id, t.type === 'expense' ? '支出' : '收入', t.amount, t.category, t.paymentMethod,
-    t.date, t.note || '', t.hasInvoice ? '是' : '否', t.invoiceType || '', t.invoiceNumber || '', t.createdAt || ''
+    t.date, t.note || '', t.hasInvoice ? '是' : '否', t.invoiceType || '', t.invoiceNumber || '', t.receiptImage ? '是' : '否', t.createdAt || ''
   ]);
   const csvContent = BOM + [headers, ...rows].map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
@@ -2921,7 +3251,7 @@ function importCSV(file) {
       const idIdx = headers.indexOf('ID'), typeIdx = headers.indexOf('类型'), amountIdx = headers.indexOf('金额');
       const catIdx = headers.indexOf('分类'), payIdx = headers.indexOf('支付方式'), dateIdx = headers.indexOf('日期');
       const noteIdx = headers.indexOf('备注'), invIdx = headers.indexOf('有发票'), invTypeIdx = headers.indexOf('发票类型');
-      const invNumIdx = headers.indexOf('发票号码'), createdIdx = headers.indexOf('创建时间');
+      const invNumIdx = headers.indexOf('发票号码'), receiptIdx = headers.indexOf('有票据照片'), createdIdx = headers.indexOf('创建时间');
 
       const data = [];
       const typeMap = { '支出': 'expense', '收入': 'income' };
@@ -2938,6 +3268,7 @@ function importCSV(file) {
           hasInvoice: cols[invIdx] === '是',
           invoiceType: cols[invTypeIdx] || '',
           invoiceNumber: cols[invNumIdx] || '',
+          receiptImage: receiptIdx >= 0 ? (cols[receiptIdx] === '是' ? '[图片数据无法通过CSV导入]' : '') : '',
           createdAt: cols[createdIdx] || new Date().toISOString()
         });
       }
@@ -3431,7 +3762,9 @@ document.getElementById('inputAmount').addEventListener('keydown', function(e) {
 // Invoice toggle
 document.querySelectorAll('input[name="invoiceToggle"]').forEach(radio => {
   radio.addEventListener('change', function() {
-    document.getElementById('invoiceFields').classList.toggle('show', this.value === 'has');
+    const show = this.value === 'has';
+    document.getElementById('invoiceFields').classList.toggle('show', show);
+    if (!show) clearReceiptImage();
   });
 });
 
@@ -3476,6 +3809,23 @@ document.getElementById('invoiceModal').addEventListener('click', function(e) {
   if (e.target === this) this.classList.remove('show');
 });
 
+// Receipt image
+document.getElementById('receiptCaptureBtn').addEventListener('click', () => {
+  document.getElementById('receiptFileInput').click();
+});
+document.getElementById('receiptFileInput').addEventListener('change', function() {
+  if (this.files[0]) handleReceiptFile(this.files[0]);
+});
+document.getElementById('receiptRemoveBtn').addEventListener('click', clearReceiptImage);
+
+// Modal close - receipt image
+document.getElementById('receiptImageModalClose').addEventListener('click', () => {
+  document.getElementById('receiptImageModal').classList.remove('show');
+});
+document.getElementById('receiptImageModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('show');
+});
+
 // Sync events
 document.getElementById('syncBtn').addEventListener('click', syncNow);
 document.getElementById('syncSettingsBtn').addEventListener('click', () => {
@@ -3501,6 +3851,23 @@ document.getElementById('deviceRefreshBtn').addEventListener('click', loadDevice
 document.getElementById('deviceModal').addEventListener('click', function(e) {
   if (e.target === this) this.classList.remove('show');
 });
+
+// Payment method management
+document.getElementById('managePaymentBtn').addEventListener('click', () => {
+  renderPaymentMethodList();
+  document.getElementById('paymentMethodModal').classList.add('show');
+});
+document.getElementById('paymentMethodModalClose').addEventListener('click', () => {
+  document.getElementById('paymentMethodModal').classList.remove('show');
+});
+document.getElementById('paymentMethodModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('show');
+});
+document.getElementById('pmAddBtn').addEventListener('click', addPaymentMethod);
+document.getElementById('pmNewName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') addPaymentMethod();
+});
+document.getElementById('pmResetBtn').addEventListener('click', resetPaymentMethods);
 
 // Sync mode tabs
 document.querySelectorAll('.sync-mode-tab').forEach(tab => {
