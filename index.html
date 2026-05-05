@@ -1526,6 +1526,40 @@ body::before {
   font-size: 13px;
 }
 
+.report-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-cat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.report-cat-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.report-cat-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.report-cat-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
 /* ============================================================
    Scrollbar styling (Webkit)
    ============================================================ */
@@ -1538,7 +1572,7 @@ body::before {
 <body>
 
 <div class="header">
-  <h1>💰 记账系统 <span style="font-size:10px;color:#888;font-weight:normal">v2.1</span></h1>
+  <h1>💰 记账系统 <span style="font-size:10px;color:#888;font-weight:normal">v2.2</span></h1>
   <div class="date-display" id="currentDate"></div>
 </div>
 
@@ -2256,15 +2290,15 @@ function drawBarChart() {
   const agg = {};
   expenseTx.forEach(t => { agg[t.category] = (agg[t.category] || 0) + t.amount; });
   const entries = Object.entries(agg).sort((a, b) => b[1] - a[1]);
-  const maxAmount = entries[0][1];
+  const total = entries.reduce((s, e) => s + e[1], 0);
   const colors = ['#f43f5e','#fb923c','#fbbf24','#34d399','#38bdf8','#a78bfa','#2dd4bf','#818cf8','#fb7185','#4ade80'];
 
   container.innerHTML = entries.map((entry, i) => {
-    const pct = (entry[1] / maxAmount * 100).toFixed(0);
+    const pct = total > 0 ? (entry[1] / total * 100).toFixed(1) : 0;
     return `<div class="category-bar">
       <div class="cat-name">${CATEGORY_ICONS[entry[0]]||''} ${entry[0]}</div>
       <div class="cat-bar-wrap">
-        <div class="cat-bar-fill" style="width:${pct}%;background:${colors[i % colors.length]}">${pct}%</div>
+        <div class="cat-bar-fill" style="width:${Math.max(pct, 1)}%;background:${colors[i % colors.length]}">${pct}%</div>
       </div>
       <div class="cat-amount">${formatMoney(entry[1])}</div>
     </div>`;
@@ -2713,7 +2747,30 @@ function generateReport() {
 
   html += '</div>';
 
-  // Row 3: Unusual alerts (if any)
+  // Row 3: Monthly category breakdown
+  if (topCategories.length > 0) {
+    html += '<div class="report-grid"><div class="report-card full-width">';
+    html += '<h4>📊 月度支出分类占比</h4>';
+    html += '<div class="report-cat-list">';
+    topCategories.forEach(([cat, amt], idx) => {
+      const pct = monthExpense > 0 ? (amt / monthExpense * 100) : 0;
+      const barColor = ['#f43f5e','#fb923c','#fbbf24','#34d399','#38bdf8','#a78bfa','#2dd4bf','#818cf8','#fb7185','#4ade80'][idx % 10];
+      const icon = CATEGORY_ICONS[cat] || '📌';
+      html += `<div class="report-cat-item">
+        <div class="report-cat-header">
+          <span>${icon} ${cat}</span>
+          <span>${formatMoney(amt)} · ${pct.toFixed(1)}%</span>
+        </div>
+        <div class="report-cat-bar-bg">
+          <div class="report-cat-bar-fill" style="width:${Math.max(pct, 2)}%;background:${barColor}"></div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    html += '</div></div>';
+  }
+
+  // Row 4: Unusual alerts (if any)
   if (topAlerts.length > 0) {
     html += '<div class="report-grid"><div class="report-card full-width">';
     html += '<h4>⚠️ 异常消费提醒</h4>';
