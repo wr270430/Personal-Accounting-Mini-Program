@@ -3079,7 +3079,7 @@ async function syncPush(silent = false) {
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
 
-    // Merge server data back (other devices' data)
+    // Merge server data back — use server merged data as source of truth
     if (result.merged && result.merged.data) {
       const serverMap = {};
       result.merged.data.forEach(t => { serverMap[t.id] = t; });
@@ -3087,10 +3087,10 @@ async function syncPush(silent = false) {
       const localMap = {};
       transactions.forEach(t => { localMap[t.id] = t; });
 
-      // Merge: server data wins if newer
-      const mergedMap = { ...localMap };
-      Object.entries(serverMap).forEach(([id, t]) => {
-        if (!mergedMap[id] || (t.createdAt >= (mergedMap[id].createdAt || ''))) {
+      // Start from server data, keep only local records newer than server
+      const mergedMap = { ...serverMap };
+      Object.entries(localMap).forEach(([id, t]) => {
+        if (!mergedMap[id] || (t.createdAt > (mergedMap[id].createdAt || ''))) {
           mergedMap[id] = t;
         }
       });
