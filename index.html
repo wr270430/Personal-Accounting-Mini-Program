@@ -1724,7 +1724,10 @@ body::before {
       <div class="form-row">
         <div class="form-group">
           <label>分类</label>
-          <select id="inputCategory"></select>
+          <div style="display:flex;gap:6px">
+            <select id="inputCategory" style="flex:1"></select>
+            <button class="btn-outline" id="manageCategoryBtn" title="管理分类" style="padding:10px;font-size:16px;border-radius:var(--radius-sm)">⚙️</button>
+          </div>
         </div>
         <div class="form-group">
           <label>支付方式</label>
@@ -1977,6 +1980,35 @@ body::before {
   </div>
 </div>
 
+<!-- Category management modal -->
+<div class="modal-overlay" id="categoryModal">
+  <div class="modal-box" style="max-width:440px">
+    <h4 id="categoryModalTitle">📂 分类管理</h4>
+    <div class="sync-mode-tabs" id="categoryTypeTabs" style="margin-bottom:10px">
+      <button class="sync-mode-tab active" data-type="expense">📤 支出分类</button>
+      <button class="sync-mode-tab" data-type="income">📥 收入分类</button>
+    </div>
+    <div class="pm-list-scroll" id="categoryList"></div>
+    <div class="pm-add-row">
+      <select class="pm-icon-select" id="catIconSelect">
+        <option value="🍽️">🍽️</option><option value="🚗">🚗</option><option value="🛒">🛒</option>
+        <option value="🏠">🏠</option><option value="🎮">🎮</option><option value="💊">💊</option>
+        <option value="📚">📚</option><option value="📱">📱</option><option value="🧴">🧴</option>
+        <option value="💼">💼</option><option value="🎁">🎁</option><option value="💻">💻</option>
+        <option value="📈">📈</option><option value="🧾">🧾</option><option value="🧧">🧧</option>
+        <option value="🎫">🎫</option><option value="📌">📌</option><option value="💡">💡</option>
+        <option value="🎓">🎓</option><option value="🐶">🐶</option><option value="✈️">✈️</option>
+      </select>
+      <input type="text" id="catNewName" placeholder="新分类名称" maxlength="10">
+      <button class="btn-outline" id="catAddBtn">+ 添加</button>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn-outline btn-danger" id="catResetBtn">🔄 恢复默认</button>
+      <button class="btn-outline" id="categoryModalClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- Invoice detail modal -->
 <div class="modal-overlay" id="invoiceModal">
   <div class="modal-box">
@@ -2004,8 +2036,11 @@ body::before {
 // Data Layer
 // ============================================================
 const STORAGE_KEY = 'accounting_data_v2';
-const EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '住房', '娱乐', '医疗', '教育', '通讯', '日用', '其他'];
-const INCOME_CATEGORIES = ['工资', '奖金', '兼职', '理财', '报销', '红包', '生活费', '补助', '其他收入'];
+const DEFAULT_EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '住房', '娱乐', '医疗', '教育', '通讯', '日用', '其他'];
+const DEFAULT_INCOME_CATEGORIES = ['工资', '奖金', '兼职', '理财', '报销', '红包', '生活费', '补助', '其他收入'];
+const CAT_STORAGE_KEY = 'accounting_categories';
+const EXPENSE_CATEGORIES = DEFAULT_EXPENSE_CATEGORIES;
+const INCOME_CATEGORIES = DEFAULT_INCOME_CATEGORIES;
 const DEFAULT_PAYMENT_METHODS = ['现金', '微信', '支付宝', '银行卡', '信用卡', '其他'];
 const PM_STORAGE_KEY = 'accounting_payment_methods';
 const PM_ICONS_KEY = 'accounting_payment_icons';
@@ -2018,6 +2053,21 @@ function getPaymentMethods() {
   return [...DEFAULT_PAYMENT_METHODS];
 }
 function savePaymentMethods(methods) { localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(methods)); }
+
+// Custom category management
+function getCategories(type) {
+  try {
+    const all = JSON.parse(localStorage.getItem(CAT_STORAGE_KEY));
+    if (all && all[type] && Array.isArray(all[type]) && all[type].length > 0) return all[type];
+  } catch {}
+  return type === 'expense' ? [...DEFAULT_EXPENSE_CATEGORIES] : [...DEFAULT_INCOME_CATEGORIES];
+}
+function saveCategories(type, cats) {
+  let all = {};
+  try { all = JSON.parse(localStorage.getItem(CAT_STORAGE_KEY)) || {}; } catch {}
+  all[type] = cats;
+  localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(all));
+}
 
 const INVOICE_TYPES = ['增值税普通发票', '增值税专用发票', '电子发票', '收据', '其他票据'];
 const CATEGORY_ICONS = {
@@ -2341,8 +2391,8 @@ function updateSummary() {
 
 function updateCategorySelect() {
   const sel = document.getElementById('inputCategory');
-  const cats = currentType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
-  sel.innerHTML = cats.map(c => `<option value="${c}">${(CATEGORY_ICONS[c]||'')} ${c}</option>`).join('');
+  const cats = getCategories(currentType);
+  sel.innerHTML = cats.map(c => `<option value="${c}">${(CATEGORY_ICONS[c]||'📌')} ${c}</option>`).join('');
 }
 
 function updatePaymentSelect() {
@@ -2410,6 +2460,66 @@ function resetPaymentMethods() {
   updatePaymentSelect();
   updateFilterPayment();
   showToast('已恢复默认支付方式');
+}
+
+// Category management UI
+let editingCategoryType = 'expense';
+
+function renderCategoryList() {
+  const container = document.getElementById('categoryList');
+  const cats = getCategories(editingCategoryType);
+  const defaults = editingCategoryType === 'expense' ? DEFAULT_EXPENSE_CATEGORIES : DEFAULT_INCOME_CATEGORIES;
+  const builtins = new Set(defaults);
+  container.innerHTML = cats.map(c => {
+    const isBuiltin = builtins.has(c);
+    return `<div class="payment-method-item">
+      <span class="pm-icon">${CATEGORY_ICONS[c] || '📌'}</span>
+      <span class="pm-name">${escapeHtml(c)}</span>
+      ${isBuiltin ? '<span class="pm-builtin">默认</span>' : ''}
+      ${!isBuiltin ? `<button class="pm-delete" data-name="${escapeHtml(c)}" title="删除">×</button>` : ''}
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.pm-delete').forEach(btn => {
+    btn.addEventListener('click', () => deleteCategory(btn.dataset.name));
+  });
+}
+
+function addCategory() {
+  const nameInput = document.getElementById('catNewName');
+  const iconSelect = document.getElementById('catIconSelect');
+  const name = nameInput.value.trim();
+  if (!name) { showToast('请输入分类名称'); return; }
+  const cats = getCategories(editingCategoryType);
+  if (cats.includes(name)) { showToast('该分类已存在'); return; }
+  CATEGORY_ICONS[name] = iconSelect.value;
+  cats.push(name);
+  saveCategories(editingCategoryType, cats);
+  renderCategoryList();
+  updateCategorySelect();
+  nameInput.value = '';
+  showToast('已添加分类：' + name);
+}
+
+function deleteCategory(name) {
+  const defaults = editingCategoryType === 'expense' ? DEFAULT_EXPENSE_CATEGORIES : DEFAULT_INCOME_CATEGORIES;
+  if (defaults.includes(name)) { showToast('默认分类不能删除'); return; }
+  const inUse = transactions.some(t => t.category === name);
+  if (inUse) { showToast('该分类有记录使用中，不能删除'); return; }
+  let cats = getCategories(editingCategoryType);
+  cats = cats.filter(c => c !== name);
+  saveCategories(editingCategoryType, cats);
+  renderCategoryList();
+  updateCategorySelect();
+  showToast('已删除分类：' + name);
+}
+
+function resetCategories() {
+  if (!confirm('确定恢复默认分类吗？自定义分类将被移除。')) return;
+  const defaults = editingCategoryType === 'expense' ? [...DEFAULT_EXPENSE_CATEGORIES] : [...DEFAULT_INCOME_CATEGORIES];
+  saveCategories(editingCategoryType, defaults);
+  renderCategoryList();
+  updateCategorySelect();
+  showToast('已恢复默认分类');
 }
 
 function drawPaymentStats() {
@@ -3874,10 +3984,40 @@ document.getElementById('pmNewName').addEventListener('keydown', function(e) {
 });
 document.getElementById('pmResetBtn').addEventListener('click', resetPaymentMethods);
 
-// Sync mode tabs
-document.querySelectorAll('.sync-mode-tab').forEach(tab => {
+// Category management
+document.getElementById('manageCategoryBtn').addEventListener('click', () => {
+  editingCategoryType = currentType;
+  document.getElementById('categoryTypeTabs').querySelectorAll('.sync-mode-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.type === editingCategoryType);
+  });
+  renderCategoryList();
+  document.getElementById('categoryModal').classList.add('show');
+});
+document.getElementById('categoryModalClose').addEventListener('click', () => {
+  document.getElementById('categoryModal').classList.remove('show');
+});
+document.getElementById('categoryModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('show');
+});
+document.querySelectorAll('#categoryTypeTabs .sync-mode-tab').forEach(tab => {
   tab.addEventListener('click', function() {
-    document.querySelectorAll('.sync-mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#categoryTypeTabs .sync-mode-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    editingCategoryType = this.dataset.type;
+    document.getElementById('categoryModalTitle').textContent = editingCategoryType === 'expense' ? '📂 支出分类管理' : '📂 收入分类管理';
+    renderCategoryList();
+  });
+});
+document.getElementById('catAddBtn').addEventListener('click', addCategory);
+document.getElementById('catNewName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') addCategory();
+});
+document.getElementById('catResetBtn').addEventListener('click', resetCategories);
+
+// Sync mode tabs
+document.querySelectorAll('#syncModeTabs .sync-mode-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('#syncModeTabs .sync-mode-tab').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
     const mode = this.dataset.mode;
     document.getElementById('syncLanSettings').style.display = mode === 'lan' ? 'block' : 'none';
