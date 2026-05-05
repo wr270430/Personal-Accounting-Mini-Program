@@ -3482,16 +3482,21 @@ async function syncPull(silent = false) {
 
     // Use merged data (all devices deduplicated) as source of truth
     if (result.merged && result.merged.data) {
+      const serverMap = {};
+      result.merged.data.forEach(t => { serverMap[t.id] = t; });
+
       const localMap = {};
       transactions.forEach(t => { localMap[t.id] = t; });
 
-      result.merged.data.forEach(t => {
-        if (!localMap[t.id] || (t.createdAt >= (localMap[t.id].createdAt || ''))) {
-          localMap[t.id] = t;
+      // Start from server data, keep local records only if newer
+      const mergedMap = { ...serverMap };
+      Object.entries(localMap).forEach(([id, t]) => {
+        if (!mergedMap[id] || (t.createdAt > (mergedMap[id].createdAt || ''))) {
+          mergedMap[id] = t;
         }
       });
 
-      transactions = Object.values(localMap);
+      transactions = Object.values(mergedMap);
       transactions.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
       saveData(transactions);
     }
