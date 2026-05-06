@@ -1286,6 +1286,25 @@ body::before {
   flex-wrap: wrap;
 }
 
+.backup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fefce8;
+  color: #a16207;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #fef08a;
+}
+.backup-badge:hover {
+  background: #fef9c3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
 .sync-status {
   display: inline-flex;
   align-items: center;
@@ -1686,6 +1705,7 @@ body::before {
     <span class="sync-status disconnected" id="syncStatus">
       <span class="sync-dot"></span> 未连接同步
     </span>
+    <span class="backup-badge" id="backupBadge" title="点击查看已删除记录（7天可恢复）">📦 备份 <b id="backupCount">0</b> 条</span>
     <button class="btn-sync primary-sync" id="syncBtn" title="同步数据到服务器">🔄 立即同步</button>
     <button class="btn-sync" id="syncSettingsBtn">⚙️ 设置</button>
   </div>
@@ -1958,6 +1978,22 @@ body::before {
   </div>
 </div>
 
+<!-- Backup management modal -->
+<div class="modal-overlay" id="backupModal">
+  <div class="modal-box" style="max-width:560px">
+    <h4>📦 备份记录 <span style="font-size:12px;color:var(--text-muted);font-weight:normal" id="backupInfoLabel"></span></h4>
+    <div id="backupList" style="max-height:360px;overflow-y:auto;margin:8px 0">
+      <div style="text-align:center;color:var(--text-secondary);padding:20px">加载中...</div>
+    </div>
+    <div class="sync-info" style="margin-bottom:4px">删除的记录保留 7 天可恢复，过期后自动永久清除。</div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn-outline" id="backupRefreshBtn">🔄 刷新</button>
+      <button class="btn-outline btn-danger" id="backupClearAllBtn" style="display:none">🗑 全部永久删除</button>
+      <button class="btn-outline" id="backupModalClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- Payment method management modal -->
 <div class="modal-overlay" id="paymentMethodModal">
   <div class="modal-box" style="max-width:440px">
@@ -2101,6 +2137,7 @@ function loadData() {
   catch { return []; }
 }
 function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function getActiveTransactions() { return transactions.filter(t => !t._deleted); }
 
 // Migrate old data to v2
 let transactions = loadData();
@@ -2141,7 +2178,7 @@ function parsePatternKey(key) {
 function rebuildMemory() {
   // Rebuild entire memory from all transactions
   const mem = {};
-  transactions.forEach(t => {
+  getActiveTransactions().forEach(t => {
     const key = buildPatternKey(t.type, t.category, t.paymentMethod);
     if (!mem[key]) {
       mem[key] = { count: 0, amounts: [], lastUsed: '', pinned: false };
@@ -2164,7 +2201,7 @@ function rebuildMemory() {
 function getMemory() {
   let mem = loadMemory();
   // If memory is empty but transactions exist, rebuild
-  if (Object.keys(mem).length === 0 && transactions.length > 0) {
+  if (Object.keys(mem).length === 0 && getActiveTransactions().length > 0) {
     mem = rebuildMemory();
   }
   return mem;
@@ -2358,7 +2395,7 @@ function showReceiptImage(dataUrl) {
 }
 
 function showReceiptImageById(id) {
-  const t = transactions.find(tx => tx.id === id);
+  const t = getActiveTransactions().find(tx => tx.id === id);
   if (t && t.receiptImage) showReceiptImage(t.receiptImage);
 }
 
@@ -2376,7 +2413,7 @@ function showToast(msg) {
 function updateSummary() {
   const monthKey = currentMonthKey();
   let income = 0, expense = 0, invoiceCount = 0;
-  transactions.forEach(t => {
+  getActiveTransactions().forEach(t => {
     if (getMonthKey(t.date) === monthKey) {
       if (t.type === 'income') income += t.amount;
       else expense += t.amount;
@@ -2503,7 +2540,7 @@ function addCategory() {
 function deleteCategory(name) {
   const defaults = editingCategoryType === 'expense' ? DEFAULT_EXPENSE_CATEGORIES : DEFAULT_INCOME_CATEGORIES;
   if (defaults.includes(name)) { showToast('默认分类不能删除'); return; }
-  const inUse = transactions.some(t => t.category === name);
+  const inUse = getActiveTransactions().some(t => t.category === name);
   if (inUse) { showToast('该分类有记录使用中，不能删除'); return; }
   let cats = getCategories(editingCategoryType);
   cats = cats.filter(c => c !== name);
@@ -2524,7 +2561,7 @@ function resetCategories() {
 
 function drawPaymentStats() {
   const monthKey = currentMonthKey();
-  const monthTx = transactions.filter(t => getMonthKey(t.date) === monthKey);
+  const monthTx = getActiveTransactions().filter(t => getMonthKey(t.date) === monthKey);
   const expenseTx = monthTx.filter(t => t.type === 'expense');
   const incomeTx = monthTx.filter(t => t.type === 'income');
 
@@ -2558,15 +2595,15 @@ function drawPaymentStats() {
 
 function updateFilterMonth() {
   const sel = document.getElementById('filterMonth');
-  const months = [...new Set(transactions.map(t => getMonthKey(t.date)))].sort().reverse();
+  const months = [...new Set(getActiveTransactions().map(t => getMonthKey(t.date)))].sort().reverse();
   sel.innerHTML = '<option value="all">全部月份</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
 }
 
 function updateFilterCategory() {
-  updateFilterSelect('filterCategory', [...new Set(transactions.map(t => t.category))].sort(), '全部分类');
+  updateFilterSelect('filterCategory', [...new Set(getActiveTransactions().map(t => t.category))].sort(), '全部分类');
 }
 function updateFilterPayment() {
-  const used = new Set(transactions.map(t => t.paymentMethod));
+  const used = new Set(getActiveTransactions().map(t => t.paymentMethod));
   const configured = new Set(getPaymentMethods());
   const methods = [...new Set([...configured, ...used])].sort();
   updateFilterSelect('filterPayment', methods, '全部支付');
@@ -2585,7 +2622,7 @@ function getFilteredTransactions() {
   const filterPayment = document.getElementById('filterPayment').value;
   const filterInvoice = document.getElementById('filterInvoice').value;
 
-  let filtered = [...transactions];
+  let filtered = getActiveTransactions();
   if (filterMonth !== 'all') filtered = filtered.filter(t => getMonthKey(t.date) === filterMonth);
   if (filterType !== 'all') filtered = filtered.filter(t => t.type === filterType);
   if (filterCategory !== 'all') filtered = filtered.filter(t => t.category === filterCategory);
@@ -2638,7 +2675,7 @@ function renderList() {
 }
 
 function showInvoiceDetail(id) {
-  const t = transactions.find(tx => tx.id === id);
+  const t = getActiveTransactions().find(tx => tx.id === id);
   if (!t) return;
   document.getElementById('invoiceModalContent').innerHTML = `
     <div style="line-height:2.2;font-size:14px">
@@ -2653,11 +2690,16 @@ function showInvoiceDetail(id) {
 }
 
 function deleteTransaction(id) {
-  if (!confirm('确定要删除这条记录吗？')) return;
-  transactions = transactions.filter(t => t.id !== id);
+  if (!confirm('确定要删除这条记录吗？记录将保留 7 天可恢复。')) return;
+  const t = transactions.find(tx => tx.id === id);
+  if (t) {
+    t._deleted = true;
+    t._deletedAt = new Date().toISOString();
+    t.createdAt = new Date().toISOString();
+  }
   saveData(transactions);
   refreshAll();
-  showToast('已删除');
+  showToast('已移入备份（7天内可恢复）');
 }
 
 // ============================================================
@@ -2671,7 +2713,7 @@ function drawPieChart() {
   ctx.clearRect(0, 0, w, h);
 
   const monthKey = currentMonthKey();
-  const expenseTx = transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === monthKey);
+  const expenseTx = getActiveTransactions().filter(t => t.type === 'expense' && getMonthKey(t.date) === monthKey);
 
   if (expenseTx.length === 0) {
     ctx.fillStyle = '#94a3b8'; ctx.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
@@ -2724,7 +2766,7 @@ function drawPieChart() {
 function drawBarChart() {
   const container = document.getElementById('barChartContainer');
   const monthKey = currentMonthKey();
-  const expenseTx = transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === monthKey);
+  const expenseTx = getActiveTransactions().filter(t => t.type === 'expense' && getMonthKey(t.date) === monthKey);
 
   if (expenseTx.length === 0) {
     container.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:40px;">本月暂无支出数据</div>';
@@ -2753,7 +2795,7 @@ function drawBarChart() {
 function drawPaymentChart() {
   const container = document.getElementById('paymentChartContainer');
   const monthKey = currentMonthKey();
-  const tx = transactions.filter(t => getMonthKey(t.date) === monthKey);
+  const tx = getActiveTransactions().filter(t => getMonthKey(t.date) === monthKey);
 
   if (tx.length === 0) {
     container.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:30px;">本月暂无数据</div>';
@@ -2799,8 +2841,8 @@ function drawTrendChart() {
     months.push(new Date(now.getFullYear(), now.getMonth() - i, 1).toISOString().slice(0, 7));
   }
 
-  const incomeData = months.map(m => transactions.filter(t => t.type === 'income' && getMonthKey(t.date) === m).reduce((s, t) => s + t.amount, 0));
-  const expenseData = months.map(m => transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === m).reduce((s, t) => s + t.amount, 0));
+  const incomeData = months.map(m => getActiveTransactions().filter(t => t.type === 'income' && getMonthKey(t.date) === m).reduce((s, t) => s + t.amount, 0));
+  const expenseData = months.map(m => getActiveTransactions().filter(t => t.type === 'expense' && getMonthKey(t.date) === m).reduce((s, t) => s + t.amount, 0));
   const maxVal = Math.max(...incomeData, ...expenseData, 1);
 
   // Round maxVal up to a clean number for grid lines
@@ -2883,7 +2925,7 @@ function drawTrendChart() {
 function drawInvoiceStats() {
   const container = document.getElementById('invoiceStatsContainer');
   const monthKey = currentMonthKey();
-  const monthTx = transactions.filter(t => getMonthKey(t.date) === monthKey);
+  const monthTx = getActiveTransactions().filter(t => getMonthKey(t.date) === monthKey);
   const withInvoice = monthTx.filter(t => t.hasInvoice);
   const withoutInvoice = monthTx.filter(t => !t.hasInvoice);
 
@@ -2932,7 +2974,7 @@ function refreshStats() {
 // ============================================================
 function generateReport() {
   const container = document.getElementById('reportContent');
-  if (transactions.length === 0) {
+  if (getActiveTransactions().length === 0) {
     container.innerHTML = '<div class="report-empty">📈 暂无数据可分析，开始记账吧！</div>';
     return;
   }
@@ -2963,10 +3005,10 @@ function generateReport() {
     : `${y}-${String(m - 1).padStart(2, '0')}`;
 
   // Transaction subsets
-  const thisWeek = transactions.filter(t => t.date >= weekStartStr && t.date <= weekEndStr);
-  const lastWeek = transactions.filter(t => t.date >= lastWeekStartStr && t.date <= lastWeekEndStr);
-  const thisMonth = transactions.filter(t => getMonthKey(t.date) === monthKey);
-  const lastMonthTx = transactions.filter(t => getMonthKey(t.date) === lastMonthKey);
+  const thisWeek = getActiveTransactions().filter(t => t.date >= weekStartStr && t.date <= weekEndStr);
+  const lastWeek = getActiveTransactions().filter(t => t.date >= lastWeekStartStr && t.date <= lastWeekEndStr);
+  const thisMonth = getActiveTransactions().filter(t => getMonthKey(t.date) === monthKey);
+  const lastMonthTx = getActiveTransactions().filter(t => getMonthKey(t.date) === lastMonthKey);
 
   function sumByType(txs, type) {
     return txs.filter(t => t.type === type).reduce((s, t) => s + t.amount, 0);
@@ -3014,7 +3056,7 @@ function generateReport() {
   const fourWeeksAgo = new Date(now);
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
   const fourWeeksAgoStr = formatDate(fourWeeksAgo);
-  const recentTx = transactions.filter(t => t.date >= fourWeeksAgoStr && t.date <= today && t.type === 'expense');
+  const recentTx = getActiveTransactions().filter(t => t.date >= fourWeeksAgoStr && t.date <= today && t.type === 'expense');
 
   const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
   const weekdayTotals = new Array(7).fill(0);
@@ -3039,7 +3081,7 @@ function generateReport() {
   // Unusual expense alerts - find transactions > 2x the median for that category
   const alerts = [];
   const allCatAmounts = {};
-  transactions.filter(t => t.type === 'expense').forEach(t => {
+  getActiveTransactions().filter(t => t.type === 'expense').forEach(t => {
     if (!allCatAmounts[t.category]) allCatAmounts[t.category] = [];
     allCatAmounts[t.category].push(t.amount);
   });
@@ -3299,14 +3341,14 @@ function addTransaction() {
 }
 
 function exportJSON() {
-  const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(getActiveTransactions(), null, 2)], { type: 'application/json' });
   downloadBlob(blob, '记账数据_' + todayStr() + '.json');
 }
 
 function exportCSV() {
   const BOM = '﻿';
   const headers = ['ID','类型','金额','分类','支付方式','日期','备注','有发票','发票类型','发票号码','有票据照片','创建时间'];
-  const rows = transactions.map(t => [
+  const rows = getActiveTransactions().map(t => [
     t.id, t.type === 'expense' ? '支出' : '收入', t.amount, t.category, t.paymentMethod,
     t.date, t.note || '', t.hasInvoice ? '是' : '否', t.invoiceType || '', t.invoiceNumber || '', t.receiptImage ? '是' : '否', t.createdAt || ''
   ]);
@@ -3425,7 +3467,113 @@ function clearAllData() {
   saveData(transactions);
   localStorage.removeItem(MEMORY_KEY);
   refreshAll();
-  showToast('数据已清空（含记忆）');
+  showToast('数据已清空（含记忆和备份）');
+}
+
+// ============================================================
+// Backup System (7-day recycle bin)
+// ============================================================
+const BACKUP_DAYS = 7;
+
+function getBackupRecords() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - BACKUP_DAYS);
+  return transactions.filter(t => t._deleted && t._deletedAt && new Date(t._deletedAt) >= cutoff);
+}
+
+function getBackupCount() {
+  return getBackupRecords().length;
+}
+
+function restoreRecord(id) {
+  const t = transactions.find(tx => tx.id === id);
+  if (!t || !t._deleted) return;
+  delete t._deleted;
+  delete t._deletedAt;
+  saveData(transactions);
+  refreshAll();
+  showToast('已恢复记录');
+}
+
+function permanentlyDeleteRecord(id) {
+  if (!confirm('确定永久删除这条备份记录吗？此操作不可恢复。')) return;
+  transactions = transactions.filter(t => t.id !== id);
+  saveData(transactions);
+  refreshAll();
+  showToast('已永久删除');
+}
+
+function cleanupOldBackups() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - BACKUP_DAYS);
+  const before = transactions.length;
+  transactions = transactions.filter(t => {
+    if (t._deleted && t._deletedAt && new Date(t._deletedAt) < cutoff) return false;
+    return true;
+  });
+  if (transactions.length < before) saveData(transactions);
+}
+
+function updateBackupBadge() {
+  const count = getBackupCount();
+  document.getElementById('backupCount').textContent = count;
+  const badge = document.getElementById('backupBadge');
+  if (count > 0) {
+    badge.style.background = '#fefce8';
+    badge.style.color = '#a16207';
+    badge.style.borderColor = '#fef08a';
+  } else {
+    badge.style.background = '#f8fafc';
+    badge.style.color = '#94a3b8';
+    badge.style.borderColor = '#e2e8f0';
+  }
+}
+
+function renderBackupModal() {
+  const container = document.getElementById('backupList');
+  const records = getBackupRecords();
+  records.sort((a, b) => b._deletedAt.localeCompare(a._deletedAt));
+
+  const expireDates = {};
+  records.forEach(r => {
+    const d = new Date(r._deletedAt);
+    d.setDate(d.getDate() + BACKUP_DAYS);
+    expireDates[r.id] = d.toLocaleDateString('zh-CN');
+  });
+
+  document.getElementById('backupInfoLabel').textContent = records.length > 0 ? `（${records.length} 条）` : '';
+
+  if (records.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:30px">📦 备份为空</div>';
+    document.getElementById('backupClearAllBtn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('backupClearAllBtn').style.display = '';
+  container.innerHTML = records.map(r => {
+    const daysLeft = Math.ceil((new Date(expireDates[r.id]) - new Date()) / 86400000);
+    const daysColor = daysLeft <= 1 ? 'var(--expense)' : daysLeft <= 3 ? 'var(--warning)' : 'var(--text-muted)';
+    return `<div class="transaction-item" style="opacity:0.75">
+      <div class="tx-icon ${r.type}">${CATEGORY_ICONS[r.category] || '📌'}</div>
+      <div class="tx-info">
+        <div class="tx-category">${r.category} · ${r.type === 'income' ? '+' : '-'}${formatMoney(r.amount)}</div>
+        <div class="tx-meta">
+          <span>📅 ${r.date}</span>
+          <span>${r.note ? '📝 ' + escapeHtml(r.note) : ''}</span>
+          <span style="color:${daysColor}">⏳ ${daysLeft} 天后永久删除</span>
+        </div>
+      </div>
+      <div class="tx-right">
+        <button class="btn-outline" style="padding:4px 10px;font-size:11px;margin-right:4px" onclick="restoreRecord(${r.id})" title="恢复记录">↩ 恢复</button>
+        <button class="tx-delete" onclick="permanentlyDeleteRecord(${r.id})" title="永久删除">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openBackupModal() {
+  renderBackupModal();
+  document.getElementById('backupModal').classList.add('show');
 }
 
 function refreshAll() {
@@ -3439,6 +3587,7 @@ function refreshAll() {
   refreshStats();
   generateReport();
   renderMemoryChips();
+  updateBackupBadge();
 }
 
 // ============================================================
@@ -4025,6 +4174,23 @@ document.querySelectorAll('#syncModeTabs .sync-mode-tab').forEach(tab => {
   });
 });
 
+// Backup modal events
+document.getElementById('backupBadge').addEventListener('click', openBackupModal);
+document.getElementById('backupModalClose').addEventListener('click', () => {
+  document.getElementById('backupModal').classList.remove('show');
+});
+document.getElementById('backupModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('show');
+});
+document.getElementById('backupRefreshBtn').addEventListener('click', renderBackupModal);
+document.getElementById('backupClearAllBtn').addEventListener('click', () => {
+  if (!confirm('确定永久删除所有备份记录吗？此操作不可恢复。')) return;
+  transactions = transactions.filter(t => !t._deleted);
+  saveData(transactions);
+  refreshAll();
+  showToast('已清除所有备份');
+});
+
 // Init
 document.getElementById('inputDate').value = todayStr();
 updateCategorySelect();
@@ -4033,8 +4199,11 @@ updatePaymentSelect();
 // Auto-configure sync from server origin
 autoConfigureSync();
 
+// Cleanup backup records older than 7 days
+cleanupOldBackups();
+
 // Rebuild memory from existing data if needed
-if (transactions.length > 0 && Object.keys(loadMemory()).length === 0) {
+if (getActiveTransactions().length > 0 && Object.keys(loadMemory()).length === 0) {
   rebuildMemory();
 }
 refreshAll();

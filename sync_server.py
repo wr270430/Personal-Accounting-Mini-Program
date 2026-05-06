@@ -88,6 +88,11 @@ def merge_data(device_id, incoming):
     save_store()
 
 
+def count_active(data_list):
+    """Count records that are not soft-deleted"""
+    return sum(1 for t in data_list if not t.get('_deleted'))
+
+
 def get_all_data():
     """合并所有设备的数据返回（按 ID 去重，取最新）"""
     merged_map = {}
@@ -168,9 +173,9 @@ class SyncHandler(BaseHTTPRequestHandler):
             self._send_json({
                 'status': 'ok',
                 'devices': len(sync_store),
-                'total_records': sum(len(d.get('data', [])) for d in sync_store.values()),
+                'total_records': sum(count_active(d.get('data', [])) for d in sync_store.values()),
                 'stored_since': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'version': '2.0'
+                'version': '2.1'
             })
 
         elif path == '/api/data':
@@ -191,7 +196,7 @@ class SyncHandler(BaseHTTPRequestHandler):
             })
 
         elif path == '/api/devices':
-            devices = {did: {'device_name': d.get('device_name', ''), 'records': len(d.get('data', [])), 'updated_at': d.get('updated_at', '')} for did, d in sync_store.items()}
+            devices = {did: {'device_name': d.get('device_name', ''), 'records': count_active(d.get('data', [])), 'updated_at': d.get('updated_at', '')} for did, d in sync_store.items()}
             self._send_json({'devices': devices, 'count': len(devices)})
 
         else:
